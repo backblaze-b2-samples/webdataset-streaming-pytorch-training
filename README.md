@@ -15,6 +15,24 @@ Explore the official [Backblaze B2 AI integrations and sample applications](http
 - Scoped shard explorer per dataset, plus a full-bucket file browser and direct-to-B2 raw-media upload.
 - FastAPI backend with strict layered architecture and structural tests, and agent-optimized docs.
 
+## What it looks like
+
+**Dashboard** — corpus totals (datasets, shards, samples, shard storage), the last streaming run's throughput and device, and a recent-datasets table.
+
+![Dashboard with corpus totals, last-run throughput, and recent datasets](docs/images/dashboard.png)
+
+**Datasets** — every WebDataset shard collection on B2 as a card with its description, shard and sample counts, size, and `datasets/<slug>/` prefix.
+
+![Datasets page showing shard-collection cards](docs/images/datasets.png)
+
+**Dataset detail** — the manifest, a bounded PyTorch streaming run with live throughput and a per-step loss curve, the non-overlapping node/worker shard split, and the per-dataset shard explorer.
+
+![Dataset detail with manifest, streaming run throughput, loss curve, node and worker shard split, and shard list](docs/images/dataset-detail.png)
+
+**Raw media** — drag-and-drop, direct-to-B2 upload that stages images under `uploads/` for the raw dataset source to pack into shards.
+
+![Raw media upload page with a drag-and-drop dropzone](docs/images/raw-media.png)
+
 ## Quick Start
 
 You need: Node.js >= 20, pnpm >= 9, Python >= 3.12, and a free **[Backblaze B2 account](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-webdataset-streaming-pytorch-training)**.
