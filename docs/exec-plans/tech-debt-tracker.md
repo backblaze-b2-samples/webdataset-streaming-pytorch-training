@@ -43,6 +43,20 @@ Low-severity polish, left for a follow-up; none blocks the core flow.
 - 404 route — the breadcrumb title-cases the unknown slug (e.g. "This Route Does Not Exist"), presenting a nonexistent route as a real page name; the rest of the 404 is solid
 - `/design` — the "Go to Upload" button inside the Patterns empty-state demo does not navigate; it is presumably a static sample, but it looks live on a linked primary surface
 
+## 2026-08-10 — verify (UX nitpicks)
+
+Low-severity polish found by the 3-lens verify funnel of the create → stream → train
+flow; all survived the adversarial gate as nitpicks (or were friction demoted to
+nitpick), and none blocks the goal. Screenshot paths are relative to `.local/verify/`.
+
+- Dashboard — the header "New dataset" button navigates to `/datasets` (the list) instead of opening the create dialog, while the list's own identically-labelled "New dataset" opens the dialog in place → two same-labelled CTAs behave differently and it costs an extra click (shot `A4/07-dashboard-newdataset-dest.png`)
+- Create dialog (synthetic) — the hint hardcodes "The default 512 synthetic samples …", so picking a different sample count yields a self-contradicting sentence (e.g. "512 synthetic samples … pack into 8 shards" at 1024 samples); the shard math is correct, only the prose is stale (shot `C4/02b-synth-hint-1024.png`)
+- Dataset detail — the header badge reads "1 shards" for a single-shard dataset while the list card and the create toast correctly say "1 shard"; pluralization is handled everywhere except this badge (shot `C4/10-raw-detail.png`)
+- Create dialog (raw media) — Source = "Raw media" depends on images already uploaded via Raw media, but the dialog offers no inline link/CTA to the Raw media page and no inline upload, so the raw-source user must detour manually (shot `A4/03-create-dialog.png`)
+- Stream & train — starting a re-run clears the previous run's results (metrics/loss/split) for the whole wait instead of keeping them dimmed/stale, so a >20s distributed re-run loses prior context (shot `B4/09-long-run-midB.png`)
+- Sidebar — no primary nav item is marked active on the dataset detail sub-route, and after a Files → reload → detail path the sidebar still highlights "Files" (shot `B3/16-detail-after-recovery.png`)
+- Error copy — a transient B2 `503 SlowDown` surfaces on the create toast as a generic "Internal server error" with no hint that a retry will likely succeed (the datasets list/stats now degrade gracefully after the verify fix, but the create path still maps 503 → generic 500) (shot `A/06-create-outcome.png`)
+
 ## Resolved
 
 | Description | Resolution |

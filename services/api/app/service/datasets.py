@@ -10,6 +10,7 @@ lives in ``service/training``.
 from __future__ import annotations
 
 import io
+import logging
 import random
 import re
 import zlib
@@ -44,6 +45,7 @@ from app.types.datasets import (
 )
 from app.types.formatting import humanize_bytes
 
+logger = logging.getLogger(__name__)
 DATASETS_PREFIX = "datasets/"
 _MANIFEST = "manifest.json"
 _RUN = "runs/latest.json"
@@ -188,9 +190,11 @@ def list_datasets() -> list[Dataset]:
     for obj in repo.list_prefix(DATASETS_PREFIX):
         if not obj["key"].endswith("/" + _MANIFEST):
             continue
-        data = repo.read_json(obj["key"])
-        if data is not None:
-            out.append(_manifest_to_dataset(data))
+        try:
+            if (data := repo.read_json(obj["key"])) is not None:
+                out.append(_manifest_to_dataset(data))
+        except Exception as e:  # one bad/transient manifest must not 500 the list
+            logger.warning("Skipping unreadable dataset manifest %s: %s", obj["key"], e)
     out.sort(key=lambda d: d.created_at, reverse=True)
     return out
 

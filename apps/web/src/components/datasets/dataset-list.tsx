@@ -70,10 +70,12 @@ export function DatasetList() {
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-2 text-xs">
                 <Badge variant="secondary" className="gap-1">
-                  <Package className="h-3 w-3" /> {d.shard_count} shards
+                  <Package className="h-3 w-3" /> {d.shard_count}{" "}
+                  {d.shard_count === 1 ? "shard" : "shards"}
                 </Badge>
                 <Badge variant="secondary" className="gap-1">
-                  <Images className="h-3 w-3" /> {d.sample_count} samples
+                  <Images className="h-3 w-3" /> {d.sample_count}{" "}
+                  {d.sample_count === 1 ? "sample" : "samples"}
                 </Badge>
                 <Badge variant="secondary" className="gap-1">
                   <HardDrive className="h-3 w-3" /> {d.size_human}

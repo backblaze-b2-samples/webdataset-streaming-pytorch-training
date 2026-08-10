@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -68,6 +69,7 @@ const DEFAULTS: Values = {
 
 export function CreateDatasetDialog() {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
   const create = useCreateDataset();
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -76,13 +78,29 @@ export function CreateDatasetDialog() {
 
   // useWatch (not form.watch) is the memo-safe subscription for values read
   // during render — it avoids the React Compiler "cannot be memoized" warning.
+  const source = useWatch({ control: form.control, name: "source" });
   const samples = Number(useWatch({ control: form.control, name: "num_samples" }));
   const perShard = Number(
     useWatch({ control: form.control, name: "samples_per_shard" })
   );
   const shardCount = Math.max(1, Math.ceil(samples / perShard));
 
+  // Packing is a single synchronous POST — tick a live elapsed counter while it
+  // is pending so the disabled button visibly advances instead of looking hung.
+  // (Reset happens in onSubmit — setState in an effect body is disallowed.)
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!create.isPending) return;
+    const started = Date.now();
+    const id = setInterval(
+      () => setElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000
+    );
+    return () => clearInterval(id);
+  }, [create.isPending]);
+
   const onSubmit = (values: Values) => {
+    setElapsed(0);
     create.mutate(
       {
         name: values.name,
@@ -95,10 +113,17 @@ export function CreateDatasetDialog() {
       {
         onSuccess: (dataset) => {
           toast.success(`Dataset "${dataset.display_name}" created`, {
-            description: `${dataset.sample_count} samples across ${dataset.shard_count} shards on B2.`,
+            description: `${dataset.sample_count} ${
+              dataset.sample_count === 1 ? "sample" : "samples"
+            } across ${dataset.shard_count} ${
+              dataset.shard_count === 1 ? "shard" : "shards"
+            } on B2.`,
           });
           form.reset(DEFAULTS);
           setOpen(false);
+          // Chain into the goal's next step: the "Start run" control lives on the
+          // dataset detail page, so land the user there instead of the list.
+          router.push(`/datasets/${dataset.slug}`);
         },
         onError: (error) =>
           toast.error("Could not create dataset", {
@@ -213,29 +238,36 @@ export function CreateDatasetDialog() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="num_samples"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Samples</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {NUM_SAMPLES.map((v) => (
-                          <SelectItem key={v} value={v}>
-                            {v}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
-              />
+              {/* Samples is a synthetic-generation count. For the raw source the
+                  packer uses whatever images already exist under uploads/ and
+                  num_samples would only cap them — hiding it avoids the "picked
+                  512, got fewer" mismatch. The field keeps its default value in
+                  form state, so the submitted payload stays valid for raw. */}
+              {source !== "raw" && (
+                <FormField
+                  control={form.control}
+                  name="num_samples"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Samples</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {NUM_SAMPLES.map((v) => (
+                            <SelectItem key={v} value={v}>
+                              {v}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
@@ -263,11 +295,17 @@ export function CreateDatasetDialog() {
             </div>
 
             <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-              The default 512 synthetic samples at 32&nbsp;px pack into{" "}
-              <span className="font-medium text-foreground">
-                {shardCount} shard{shardCount === 1 ? "" : "s"}
-              </span>{" "}
-              &mdash; a fast, offline demo run.
+              {source === "raw" ? (
+                "Packs the raw media already uploaded to your bucket into WebDataset shards on B2."
+              ) : (
+                <>
+                  The default 512 synthetic samples at 32&nbsp;px pack into{" "}
+                  <span className="font-medium text-foreground">
+                    {shardCount} shard{shardCount === 1 ? "" : "s"}
+                  </span>{" "}
+                  &mdash; a fast, offline demo run.
+                </>
+              )}
             </p>
 
             <DialogFooter>
@@ -280,7 +318,10 @@ export function CreateDatasetDialog() {
                 Cancel
               </Button>
               <Button type="submit" disabled={create.isPending}>
-                {create.isPending ? "Packing shards..." : "Create dataset"}
+                {create.isPending && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                )}
+                {create.isPending ? `Packing shards… ${elapsed}s` : "Create dataset"}
               </Button>
             </DialogFooter>
           </form>

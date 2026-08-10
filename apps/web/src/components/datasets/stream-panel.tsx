@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Play, Cpu, Gauge, Timer, Network } from "lucide-react";
+import { Play, Cpu, Gauge, Timer, Network, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,17 +61,22 @@ const SELECTS: { name: keyof Values; label: string; options: readonly string[] }
 ];
 
 function LossSparkline({ values }: { values: number[] }) {
-  if (values.length < 2) return null;
+  if (values.length === 0) return null;
   const max = Math.max(...values);
   const min = Math.min(...values);
   const span = max - min || 1;
-  const points = values
-    .map((v, i) => {
-      const x = (i / (values.length - 1)) * 100;
-      const y = 30 - ((v - min) / span) * 28 - 1;
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(" ");
+  // A single training step has no slope to draw — render a flat baseline so the
+  // advertised loss section still shows something instead of a blank/NaN chart.
+  const points =
+    values.length === 1
+      ? "0,15 100,15"
+      : values
+          .map((v, i) => {
+            const x = (i / (values.length - 1)) * 100;
+            const y = 30 - ((v - min) / span) * 28 - 1;
+            return `${x.toFixed(2)},${y.toFixed(2)}`;
+          })
+          .join(" ");
   return (
     <svg viewBox="0 0 100 30" preserveAspectRatio="none" className="h-16 w-full">
       <polyline
@@ -145,7 +151,23 @@ export function StreamPanel({ slug }: { slug: string }) {
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: DEFAULTS });
   const result = stream.data;
 
+  // A single synchronous POST returns the full result only at completion, so
+  // there is no server-side progress to render. Tick a live elapsed counter
+  // while the run is pending so a >10s distributed run can't look frozen.
+  // (Reset happens in onSubmit — setState in an effect body is disallowed.)
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!stream.isPending) return;
+    const started = Date.now();
+    const id = setInterval(
+      () => setElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000
+    );
+    return () => clearInterval(id);
+  }, [stream.isPending]);
+
   const onSubmit = (values: Values) => {
+    setElapsed(0);
     stream.mutate(
       {
         num_workers: Number(values.num_workers),
@@ -209,6 +231,10 @@ export function StreamPanel({ slug }: { slug: string }) {
                 />
               ))}
             </div>
+            <p className="text-xs text-muted-foreground">
+              More workers and nodes add per-process startup overhead — they pay
+              off on large datasets, not this tiny demo corpus.
+            </p>
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-muted-foreground">
                 Detected device:{" "}
@@ -217,8 +243,12 @@ export function StreamPanel({ slug }: { slug: string }) {
                 </span>
               </p>
               <Button type="submit" disabled={stream.isPending}>
-                <Play className="h-3.5 w-3.5" />
-                {stream.isPending ? "Streaming..." : "Start run"}
+                {stream.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Play className="h-3.5 w-3.5" />
+                )}
+                {stream.isPending ? `Streaming… ${elapsed}s` : "Start run"}
               </Button>
             </div>
           </form>
@@ -227,10 +257,12 @@ export function StreamPanel({ slug }: { slug: string }) {
         {result && (
           <div className="space-y-5 border-t border-border pt-5">
             <Metrics result={result} />
-            {result.loss_curve.length > 1 && (
+            {result.loss_curve.length >= 1 && (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Loss ({result.loss_curve.length} steps)
+                  {result.loss_curve.length === 1
+                    ? `Loss: ${result.loss_curve[0]} (1 step)`
+                    : `Loss (${result.loss_curve.length} steps)`}
                 </p>
                 <LossSparkline values={result.loss_curve} />
               </div>

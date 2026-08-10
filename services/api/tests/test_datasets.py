@@ -185,6 +185,31 @@ async def test_delete_is_prefix_scoped(client, fake_b2):
     assert "datasets/keepme/manifest.json" in fake_b2
 
 
+async def test_list_skips_unreadable_manifest(client, fake_b2):
+    # A good dataset plus a neighbour whose manifest is corrupt/partially
+    # written. One bad manifest must not turn the whole list/stats endpoint
+    # into a 500 — the sample streams from B2 where read failures are expected.
+    await client.post(
+        "/datasets",
+        json={
+            "name": "goodset",
+            "source": "synthetic",
+            "num_samples": 128,
+            "samples_per_shard": 128,
+            "image_size": 32,
+        },
+    )
+    fake_b2["datasets/badset/manifest.json"] = b"{not valid json"
+
+    listing = await client.get("/datasets")
+    assert listing.status_code == 200, listing.text
+    assert [d["slug"] for d in listing.json()] == ["goodset"]
+
+    stats = await client.get("/datasets/stats")
+    assert stats.status_code == 200, stats.text
+    assert stats.json()["total_datasets"] == 1
+
+
 async def test_stats_aggregate(client, fake_b2):
     await client.post(
         "/datasets",
