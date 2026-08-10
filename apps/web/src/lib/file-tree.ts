@@ -1,4 +1,4 @@
-import type { FileMetadata } from "@vibe-coding-starter-kit/shared";
+import type { FileMetadata } from "@webdataset-streaming-pytorch-training/shared";
 
 export interface TreeFolder {
   type: "folder";

@@ -71,3 +71,91 @@ export interface UploadStats {
   uploads_today: number;
   total_downloads: number;
 }
+
+// --- Datasets (WebDataset shard collections on B2) -----------------------
+
+export interface ShardEntry {
+  key: string;
+  size_bytes: number;
+  count: number;
+}
+
+export interface Dataset {
+  slug: string;
+  display_name: string;
+  description: string;
+  modality: "image";
+  image_size: number;
+  seed: number;
+  created_at: string;
+  sample_count: number;
+  shard_count: number;
+  total_size_bytes: number;
+  size_human: string;
+  shards: ShardEntry[];
+  splits: Record<string, number>;
+}
+
+export interface CreateDatasetRequest {
+  name: string;
+  description?: string;
+  source: "synthetic" | "raw";
+  num_samples: number;
+  samples_per_shard: number;
+  image_size: number;
+}
+
+export interface EditDatasetRequest {
+  display_name?: string;
+  description?: string;
+}
+
+export interface ShardListEntry {
+  key: string;
+  filename: string;
+  size_bytes: number;
+  size_human: string;
+  count: number;
+  preview_url: string | null;
+}
+
+export interface DatasetStats {
+  total_datasets: number;
+  total_shards: number;
+  total_samples: number;
+  total_size_bytes: number;
+  total_size_human: string;
+  last_run_samples_per_s: number | null;
+  last_run_device: string | null;
+}
+
+export interface StreamRequest {
+  num_workers: number;
+  num_nodes: number;
+  batch_size: number;
+  max_batches: number;
+  shuffle_buffer: number;
+}
+
+export interface ShardAssignment {
+  rank: number;
+  world_size: number;
+  shard_indices: number[];
+}
+
+export interface StreamResult {
+  device: string;
+  elapsed_s: number;
+  samples: number;
+  batches: number;
+  bytes_read: number;
+  samples_per_s: number;
+  mb_per_s: number;
+  loss_curve: number[];
+  worker_plan: ShardAssignment[];
+  node_plan: ShardAssignment[];
+  num_workers: number;
+  num_nodes: number;
+  batch_size: number;
+  created_at: string;
+}

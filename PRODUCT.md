@@ -6,38 +6,41 @@ product
 
 ## Users
 
-AI coding agents and "vibe coders" (developers who lean on AI to move fast) who clone
-this kit as the foundation for a new full-stack app. Their context: they want to skip
-the boilerplate loop (dashboard, upload, file browser, cloud storage wiring) and go
-straight to building their app's unique features. They read the repo, keep the shared
-scaffolding, and rebrand + rewrite the dashboard for their own use case.
+ML engineers and platform teams evaluating **object storage as the data plane for
+training**. Their context: the training corpus already lives on Backblaze B2, and they
+want a proven pattern for streaming it into PyTorch without staging it on local disk —
+sharding with WebDataset, a manifest index, a custom `s3://` opener, and the worker/node
+split that scales reads across GPUs/nodes from one bucket. AI coding agents also read
+the repo to extend it for a real corpus.
 
 ## Product Purpose
 
-An engineering-grade full-stack starter kit (Next.js 16 + React 19 + Tailwind v4 +
-shadcn/ui frontend, FastAPI backend) with Backblaze B2 cloud storage integrated out of
-the box. It ships a dashboard, drag-and-drop upload, and a file browser so builders
-start from a working app, not a blank page. Success = a builder can clone it, run it,
-rebrand it via one config file, and trust every screen enough to build on top without
-first fixing it.
+A working reference app (Next.js 16 + React 19 + Tailwind v4 + shadcn/ui frontend,
+FastAPI backend) that packs media into WebDataset `.tar` shards, writes them and a JSON
+manifest directly to Backblaze B2, then streams them back through WebDataset/WebLoader
+into a bounded PyTorch loop that reports live throughput. Everything runs on local
+open-source (PyTorch + WebDataset, device auto-detected CUDA → MPS → CPU); B2 credentials
+are the only secret. Success = a user can create a dataset, watch shards land on B2, and
+stream them into a training loop in seconds — and trust the pattern enough to point it at
+their own corpus.
 
 ## Maturity and Support Boundary
 
-This is a maintained open-source template/sample, not a complete hosted SaaS product.
-It is built with production-minded controls and can be adapted for production use with
-caution, but adopters own product-specific validation, security, deployment, and
-operations. Repository defects and feature requests go through the public GitHub issue
-tracker; B2 account, billing, service, and API questions go through Backblaze Support.
-The template/sample itself is not covered by the Backblaze service level agreement,
-and no SLA is provided for the repository software.
+This is a maintained open-source sample, not a complete hosted training service or a
+large-scale distributed trainer (the PyTorch loop is a deliberately tiny, bounded CNN
+that demonstrates streaming throughput, not model quality). It is built with
+production-minded controls and can be adapted with caution, but adopters own
+product-specific validation, security, deployment, and operations. Repository defects go
+through the public GitHub issue tracker; B2 account, billing, service, and API questions
+go through Backblaze Support. The sample is not covered by the Backblaze service level
+agreement, and no SLA is provided for the repository software.
 
 ## Brand Personality
 
-Confident, precise, quietly professional. Voice is direct and free of hype ("Stop
-wiring boilerplate and start building"). The interface should feel like a modern
-developer tool — considered, calm, trustworthy — not a marketing showpiece. It is a
-**neutral foundation** that others rebrand: the design carries craft through restraint,
-not through a strong opinionated identity of its own.
+Confident, precise, quietly professional. Voice is direct and free of hype ("Stream
+your corpus straight from B2 into PyTorch"). The interface should feel like a modern
+developer/ML tool — considered, calm, trustworthy — not a marketing showpiece. The
+design carries craft through restraint, not through a loud opinionated identity.
 
 ## Anti-references
 

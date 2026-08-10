@@ -4,19 +4,17 @@
 ## Components
 
 - **apps/web/** — Next.js 16 frontend (App Router, Tailwind v4, shadcn/ui)
-  - Dashboard with stats, upload chart, recent uploads
-  - File upload with drag-and-drop, progress tracking
-  - File browser with preview, download, delete
+  - Datasets: list + create, and a detail page (manifest, shard explorer, edit, delete, stream/train panel)
+  - Dashboard with dataset stats and last-run throughput
+  - Raw media upload (drag-and-drop, direct-to-B2) and a full-bucket file browser
   - Dark mode via `next-themes`
 - **services/api/** — FastAPI backend (layered architecture)
-  - REST API for file upload, listing, deletion
-  - B2 S3 integration via boto3
-  - File metadata extraction (images, PDFs)
-  - Health check endpoint with B2 connectivity verification
-  - Structured JSON logging with request tracing
-  - Prometheus-format metrics endpoint
+  - REST API for the dataset lifecycle (create/list/read/shards/stats/edit/delete/stream) plus raw-media upload and file listing
+  - B2 S3 integration via boto3, including a custom WebDataset `s3://` opener
+  - WebDataset shard writing (`ShardWriter`) + a bounded PyTorch training loop
+  - Health check, structured JSON logging, Prometheus-format metrics
 - **packages/shared/** — TypeScript type definitions
-  - Mirrors Pydantic models from the API
+  - Mirrors Pydantic models from the API (Dataset, ShardListEntry, StreamResult, …)
   - Consumed by `apps/web/` as workspace dependency
 
 ## Backend Layering
@@ -49,13 +47,18 @@ runtime/   FastAPI routes — calls service, never repo directly
 services/api/
   main.py                  App entrypoint, middleware, router registration
   app/
-    types/                 Pydantic models (FileMetadata, UploadStats, etc.)
-    config/                Settings loaded from environment
-    repo/                  B2 S3 client (data access layer)
-    service/               Business logic (upload, files, metadata)
-    runtime/               FastAPI route handlers
-  tests/                   pytest tests (structural + integration)
+    types/                 Pydantic models (Dataset, StreamResult, FileMetadata, ...)
+    config/                Settings loaded from environment (B2_REGION-derived endpoint)
+    repo/                  B2 S3 access: b2_client, datasets_repo, webdataset_repo (ShardWriter + s3:// opener)
+    service/               Business logic: datasets, synthetic, training (torch), upload, files, metadata
+    runtime/               FastAPI route handlers: datasets, files, upload, health, metrics
+  tests/                   pytest tests (structural + integration; hermetic, no network)
 ```
+
+`repo/webdataset_repo.py` is the B2↔WebDataset boundary: it registers the
+`s3://` opener (streaming shard reads through the user-agent-tagged client),
+drives `ShardWriter` uploads, and builds the `WebLoader`. torch is confined to
+`service/training.py`; boto3 stays only in `repo/`.
 
 ## Boundary Invariants
 
@@ -90,9 +93,9 @@ External provisioning and deployment remain explicit user-approved actions.
 ## Data Stores
 
 - **Backblaze B2** — object storage (S3-compatible API)
-  - All uploaded files stored in a single bucket
-  - File listing and metadata via S3 `list_objects_v2` / `head_object`
-  - No application database — B2 is the sole data store
+  - Datasets live under `datasets/<slug>/` (`.tar` shards, `manifest.json`, `runs/latest.json`); raw media under `uploads/`
+  - The `manifest.json` object IS the dataset record — no application database
+  - Shards are read back sequentially through the WebDataset `s3://` opener (`get_object` streaming body), never staged to local disk
 
 ## External Services
 
@@ -108,10 +111,10 @@ See [docs/SECURITY.md](docs/SECURITY.md) for full security documentation.
 
 ## Data Flows
 
-- **Upload**: Browser -> `POST /upload/presign` (API validates the declared file + signs a PUT) -> Browser PUTs bytes **directly to B2** -> `POST /upload/verify` (API HEADs + Range-sniffs the stored object) -> response
-- **List**: Browser -> `GET /files` -> service calls repo -> returns file list
-- **Download**: Browser -> `GET /files/{key}/download` -> service validates key -> repo generates presigned URL -> browser downloads
-- **Delete**: Browser -> `DELETE /files/{key}` -> service validates key -> repo deletes from B2
+- **Create dataset**: Browser -> `POST /datasets` -> service generates samples (synthetic or from `uploads/`) -> `repo/webdataset_repo.write_shards` drives `ShardWriter`, uploading each `.tar` to B2 -> service writes `manifest.json` -> response
+- **Stream/train**: Browser -> `POST /datasets/{slug}/stream` -> service builds seed-shuffled `s3://` shard URLs -> WebDataset reads each shard body through the `s3://` opener -> bounded PyTorch loop on the auto-detected device -> `runs/latest.json` written -> throughput + split plan response
+- **Raw upload**: Browser -> `POST /upload/presign` -> Browser PUTs bytes **directly to B2** under `uploads/` -> `POST /upload/verify` -> response
+- **List / delete**: Browser -> `GET /datasets` (or `/files`) / `DELETE /datasets/{slug}` -> service -> repo (prefix-scoped delete for datasets)
 
 ## Observability
 
@@ -134,22 +137,27 @@ silently drift from FastAPI. `GET /metrics` is intentionally server-only.
 
 ## Canonical Files
 
-- Layered API handler: `services/api/app/runtime/upload.py`
-- Service orchestration: `services/api/app/service/upload.py`
-- B2 data access (repo layer): `services/api/app/repo/b2_client.py`
-- Pydantic models: `services/api/app/types/` (`files.py`, `upload.py`, `stats.py`, `formatting.py`)
+- Layered API handler: `services/api/app/runtime/datasets.py`
+- Service orchestration: `services/api/app/service/datasets.py`
+- B2↔WebDataset boundary (repo): `services/api/app/repo/webdataset_repo.py`
+- B2 object access (repo): `services/api/app/repo/datasets_repo.py`, `b2_client.py`
+- Training loop (torch, service): `services/api/app/service/training.py`
+- Pydantic models: `services/api/app/types/` (`datasets.py`, `files.py`, `upload.py`, `stats.py`)
 - Config (pydantic-settings): `services/api/app/config/settings.py`
 - Structural tests: `services/api/tests/test_structure.py`
 - OpenAPI contract: `docs/api/openapi.json`
-- OpenAPI exporter: `services/api/scripts/export_openapi.py`
 - Frontend API client: `apps/web/src/lib/api-client.ts`
 - Shared TypeScript types: `packages/shared/src/types.ts`
 
 ## Core Features
 
-- [File Upload](docs/features/file-upload.md)
+- [Datasets](docs/features/datasets.md)
+- [Shard ingest](docs/features/shard-ingest.md)
+- [Streaming training](docs/features/streaming-training.md)
+- [Distributed sharding](docs/features/distributed-sharding.md)
+- [Shard explorer](docs/features/shard-explorer.md)
 - [File Browser](docs/features/file-browser.md)
-- [Dashboard](docs/features/dashboard.md)
+- [Raw media](docs/features/raw-media.md)
 - [Metadata Extraction](docs/features/metadata-extraction.md)
 
 ## References

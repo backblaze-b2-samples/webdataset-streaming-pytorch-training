@@ -12,6 +12,15 @@ boto3>=1.35.0
 Pillow>=11.0.0
 PyPDF2>=3.0.0
 
+# WebDataset streaming + local PyTorch training. Upper bounds pinned on purpose:
+# an unbounded torch/webdataset is a known clean-install false-green (boots and
+# tests pass, then the marquee ML path errors on a fresh clone). No torchvision
+# — images decode via Pillow and are hand-converted to tensors. numpy<2 for
+# torch/decode compatibility.
+torch>=2.2,<2.9
+webdataset>=0.2.100,<0.3
+numpy>=1.26,<2
+
 # Dev / quality
 ruff>=0.8.0
 pytest>=8.0.0

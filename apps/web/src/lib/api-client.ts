@@ -1,11 +1,18 @@
 import type {
+  CreateDatasetRequest,
   DailyUploadCount,
+  Dataset,
+  DatasetStats,
+  EditDatasetRequest,
   FileMetadata,
   FileMetadataDetail,
   FileUploadResponse,
   PresignUploadResponse,
+  ShardListEntry,
+  StreamRequest,
+  StreamResult,
   UploadStats,
-} from "@vibe-coding-starter-kit/shared";
+} from "@webdataset-streaming-pytorch-training/shared";
 
 // Single-origin deploys (Vercel `services`: one project serving web + API) put
 // the API under /api on the same origin, so no NEXT_PUBLIC_API_URL is needed —
@@ -17,12 +24,23 @@ export const API_BASE =
   (process.env.NODE_ENV === "production" ? "/api" : "http://localhost:8000");
 
 type ApiClientRoute = {
-  method: "delete" | "get" | "post";
+  method: "delete" | "get" | "patch" | "post";
   path: string;
 };
 
 export const API_CLIENT_ROUTES = {
   health: { method: "get", path: "/health" },
+  // Datasets (WebDataset shard collections on B2). Paths use the literal
+  // `{slug}` template so they match the OpenAPI path strings exactly (the
+  // api-contract test compares path+method against the spec).
+  datasets: { method: "get", path: "/datasets" },
+  datasetStats: { method: "get", path: "/datasets/stats" },
+  dataset: { method: "get", path: "/datasets/{slug}" },
+  datasetShards: { method: "get", path: "/datasets/{slug}/shards" },
+  createDataset: { method: "post", path: "/datasets" },
+  editDataset: { method: "patch", path: "/datasets/{slug}" },
+  deleteDataset: { method: "delete", path: "/datasets/{slug}" },
+  streamDataset: { method: "post", path: "/datasets/{slug}/stream" },
   files: { method: "get", path: "/files" },
   fileStats: { method: "get", path: "/files/stats" },
   uploadActivity: { method: "get", path: "/files/stats/activity" },
@@ -175,6 +193,69 @@ function isLegacyPathFallbackSafe(
 export async function getHealth() {
   return apiFetch<{ status: string; b2_connected: boolean }>(
     API_CLIENT_ROUTES.health.path
+  );
+}
+
+// --- Datasets -----------------------------------------------------------
+
+function datasetPath(template: string, slug: string): string {
+  if (slug.length === 0) {
+    throw new ApiError("Dataset slug is required", 400);
+  }
+  return template.replace("{slug}", encodeURIComponent(slug));
+}
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
+export async function getDatasets() {
+  return apiFetch<Dataset[]>(API_CLIENT_ROUTES.datasets.path);
+}
+
+export async function getDatasetStats() {
+  return apiFetch<DatasetStats>(API_CLIENT_ROUTES.datasetStats.path);
+}
+
+export async function getDataset(slug: string) {
+  return apiFetch<Dataset>(datasetPath(API_CLIENT_ROUTES.dataset.path, slug));
+}
+
+export async function getDatasetShards(slug: string) {
+  return apiFetch<ShardListEntry[]>(
+    datasetPath(API_CLIENT_ROUTES.datasetShards.path, slug)
+  );
+}
+
+export async function createDataset(body: CreateDatasetRequest) {
+  return apiFetch<Dataset>(API_CLIENT_ROUTES.createDataset.path, {
+    method: API_CLIENT_ROUTES.createDataset.method.toUpperCase(),
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body),
+  });
+}
+
+export async function editDataset(slug: string, body: EditDatasetRequest) {
+  return apiFetch<Dataset>(datasetPath(API_CLIENT_ROUTES.editDataset.path, slug), {
+    method: API_CLIENT_ROUTES.editDataset.method.toUpperCase(),
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteDataset(slug: string) {
+  return apiFetch<{ deleted: boolean; slug: string; objects: number }>(
+    datasetPath(API_CLIENT_ROUTES.deleteDataset.path, slug),
+    { method: API_CLIENT_ROUTES.deleteDataset.method.toUpperCase() }
+  );
+}
+
+export async function streamDataset(slug: string, body: StreamRequest) {
+  return apiFetch<StreamResult>(
+    datasetPath(API_CLIENT_ROUTES.streamDataset.path, slug),
+    {
+      method: API_CLIENT_ROUTES.streamDataset.method.toUpperCase(),
+      headers: JSON_HEADERS,
+      body: JSON.stringify(body),
+    }
   );
 }
 

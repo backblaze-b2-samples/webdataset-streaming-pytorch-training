@@ -8,7 +8,7 @@ Extract rich metadata (checksums, image/PDF fields) from stored objects, on dema
 - API: `POST /upload/verify` — the direct-to-B2 upload no longer streams bytes through the API, so extraction no longer runs at upload and the verify response returns `metadata: null`
 - API: `GET /files-by-key/detail?key=…` — the **only** path that returns a full `FileMetadataDetail`; recomputes it on demand for an already-stored object
 - UI: the Files browser preview dialog renders it via `FileMetadataPanel`, behind a "Detailed metadata" disclosure that fetches lazily on expand (`apps/web/src/components/files/file-preview.tsx`)
-- UI: the Upload page's completed rows no longer show inline extraction — the direct-to-B2 upload never streams bytes through the API, so the verify response carries `metadata: null` and `upload-progress.tsx` only offers "View in Files"
+- UI: the Raw media page's completed rows no longer show inline extraction — the direct-to-B2 upload never streams bytes through the API, so the verify response carries `metadata: null` and `upload-progress.tsx` only offers "View in Files". Rich metadata powers the full-bucket File Browser's file-detail panel
 
 > Note: extraction is **not** persisted, and (since uploads go directly to B2) it no longer runs at upload at all — the verify response returns `metadata: null`. It is computed only on demand: the `/files-by-key/detail` endpoint re-downloads the object and re-runs extraction — so the checksums/EXIF/PDF fields cost a full object download and are size-guarded (objects above `max_file_size` are refused with 413). The cheap `GET /files-by-key/metadata` (a `head_object`) still returns only the core fields (key, size, type, uploaded-at). Persisting metadata to avoid the re-download is tracked in the tech-debt tracker.
 
@@ -68,4 +68,4 @@ Extract rich metadata (checksums, image/PDF fields) from stored objects, on dema
 
 ## Related Docs
 - [ARCHITECTURE.md](../../ARCHITECTURE.md)
-- [File Upload](file-upload.md)
+- [Raw media](raw-media.md)

@@ -8,7 +8,14 @@ import {
 } from "@tanstack/react-query";
 import {
   ApiError,
+  createDataset,
+  deleteDataset,
   deleteFile,
+  editDataset,
+  getDataset,
+  getDatasets,
+  getDatasetShards,
+  getDatasetStats,
   getDownloadUrl,
   getFileDetail,
   getFiles,
@@ -16,11 +23,19 @@ import {
   getHealth,
   getPreviewUrl,
   getUploadActivity,
+  streamDataset,
 } from "@/lib/api-client";
 import type {
+  CreateDatasetRequest,
+  Dataset,
+  DatasetStats,
+  EditDatasetRequest,
   FileMetadata,
   FileMetadataDetail,
-} from "@vibe-coding-starter-kit/shared";
+  ShardListEntry,
+  StreamRequest,
+  StreamResult,
+} from "@webdataset-streaming-pytorch-training/shared";
 
 // Single source of truth for query keys. Keep these tightly scoped so that
 // invalidating "files" doesn't blow away unrelated caches, and so an IDE
@@ -35,6 +50,11 @@ export const qk = {
   preview: (key: string) => [...qk.all, "preview", key] as const,
   detail: (key: string) => [...qk.all, "detail", key] as const,
   health: () => [...qk.all, "health"] as const,
+  datasets: () => [...qk.all, "datasets"] as const,
+  datasetStats: () => [...qk.all, "datasets", "stats"] as const,
+  dataset: (slug: string) => [...qk.all, "datasets", slug] as const,
+  datasetShards: (slug: string) =>
+    [...qk.all, "datasets", slug, "shards"] as const,
 };
 
 export type Health = Awaited<ReturnType<typeof getHealth>>;
@@ -167,5 +187,77 @@ export function useDeleteFile() {
       dropDeletedFileFromCache(qc, fileKey);
       qc.invalidateQueries({ queryKey: qk.all });
     },
+  });
+}
+
+// --- Datasets -----------------------------------------------------------
+
+export function useDatasets({ enabled = true }: QueryGate = {}) {
+  return useQuery<Dataset[], ApiError>({
+    queryKey: qk.datasets(),
+    queryFn: getDatasets,
+    enabled,
+  });
+}
+
+export function useDatasetStats({ enabled = true }: QueryGate = {}) {
+  return useQuery<DatasetStats, ApiError>({
+    queryKey: qk.datasetStats(),
+    queryFn: getDatasetStats,
+    enabled,
+  });
+}
+
+export function useDataset(slug: string, { enabled = true }: QueryGate = {}) {
+  return useQuery<Dataset, ApiError>({
+    queryKey: qk.dataset(slug),
+    queryFn: () => getDataset(slug),
+    enabled: enabled && !!slug,
+  });
+}
+
+export function useDatasetShards(slug: string, { enabled = true }: QueryGate = {}) {
+  return useQuery<ShardListEntry[], ApiError>({
+    queryKey: qk.datasetShards(slug),
+    queryFn: () => getDatasetShards(slug),
+    enabled: enabled && !!slug,
+  });
+}
+
+export function useCreateDataset() {
+  const qc = useQueryClient();
+  return useMutation<Dataset, ApiError, CreateDatasetRequest>({
+    mutationFn: (body) => createDataset(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.datasets() }),
+  });
+}
+
+export function useEditDataset(slug: string) {
+  const qc = useQueryClient();
+  return useMutation<Dataset, ApiError, EditDatasetRequest>({
+    mutationFn: (body) => editDataset(slug, body),
+    onSuccess: (data) => {
+      qc.setQueryData(qk.dataset(slug), data);
+      qc.invalidateQueries({ queryKey: qk.datasets() });
+    },
+  });
+}
+
+export function useDeleteDataset() {
+  const qc = useQueryClient();
+  return useMutation<{ deleted: boolean; slug: string; objects: number }, ApiError, string>({
+    mutationFn: (slug) => deleteDataset(slug),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.datasets() }),
+  });
+}
+
+// A run has server side effects (writes runs/latest.json) and must never be
+// cached or replayed — hence a mutation. On success the dataset stats become
+// stale (last-run throughput), so reconcile them.
+export function useStreamDataset(slug: string) {
+  const qc = useQueryClient();
+  return useMutation<StreamResult, ApiError, StreamRequest>({
+    mutationFn: (body) => streamDataset(slug, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.datasetStats() }),
   });
 }

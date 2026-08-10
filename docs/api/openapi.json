@@ -1,6 +1,57 @@
 {
   "components": {
     "schemas": {
+      "CreateDatasetRequest": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "image_size": {
+            "default": 32,
+            "title": "Image Size",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 50,
+            "minLength": 2,
+            "title": "Name",
+            "type": "string"
+          },
+          "num_samples": {
+            "default": 512,
+            "title": "Num Samples",
+            "type": "integer"
+          },
+          "samples_per_shard": {
+            "default": 128,
+            "title": "Samples Per Shard",
+            "type": "integer"
+          },
+          "source": {
+            "default": "synthetic",
+            "enum": [
+              "synthetic",
+              "raw"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateDatasetRequest",
+        "type": "object"
+      },
       "DailyUploadCount": {
         "properties": {
           "date": {
@@ -17,6 +68,174 @@
           "uploads"
         ],
         "title": "DailyUploadCount",
+        "type": "object"
+      },
+      "Dataset": {
+        "description": "A WebDataset shard collection living under `datasets/<slug>/` in B2.\n\nThis IS the `manifest.json` index \u2014 there is no database; the manifest\nobject in B2 is the source of truth (stateless-over-B2, like the starter).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "image_size": {
+            "title": "Image Size",
+            "type": "integer"
+          },
+          "modality": {
+            "const": "image",
+            "default": "image",
+            "title": "Modality",
+            "type": "string"
+          },
+          "sample_count": {
+            "title": "Sample Count",
+            "type": "integer"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "integer"
+          },
+          "shard_count": {
+            "title": "Shard Count",
+            "type": "integer"
+          },
+          "shards": {
+            "items": {
+              "$ref": "#/components/schemas/ShardEntry"
+            },
+            "title": "Shards",
+            "type": "array"
+          },
+          "size_human": {
+            "default": "",
+            "title": "Size Human",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "splits": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Splits",
+            "type": "object"
+          },
+          "total_size_bytes": {
+            "default": 0,
+            "title": "Total Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "slug",
+          "display_name",
+          "image_size",
+          "seed",
+          "created_at",
+          "sample_count",
+          "shard_count"
+        ],
+        "title": "Dataset",
+        "type": "object"
+      },
+      "DatasetStats": {
+        "description": "Dataset-centric dashboard aggregates.",
+        "properties": {
+          "last_run_device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Device"
+          },
+          "last_run_samples_per_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Samples Per S"
+          },
+          "total_datasets": {
+            "title": "Total Datasets",
+            "type": "integer"
+          },
+          "total_samples": {
+            "title": "Total Samples",
+            "type": "integer"
+          },
+          "total_shards": {
+            "title": "Total Shards",
+            "type": "integer"
+          },
+          "total_size_bytes": {
+            "title": "Total Size Bytes",
+            "type": "integer"
+          },
+          "total_size_human": {
+            "title": "Total Size Human",
+            "type": "string"
+          }
+        },
+        "required": [
+          "total_datasets",
+          "total_shards",
+          "total_samples",
+          "total_size_bytes",
+          "total_size_human"
+        ],
+        "title": "DatasetStats",
+        "type": "object"
+      },
+      "EditDatasetRequest": {
+        "description": "Cheap metadata edit \u2014 the slug is immutable, only display fields change.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          }
+        },
+        "title": "EditDatasetRequest",
         "type": "object"
       },
       "FileMetadata": {
@@ -373,6 +592,221 @@
         "title": "PresignUploadResponse",
         "type": "object"
       },
+      "ShardAssignment": {
+        "description": "Which shard indices one worker/node reads under the round-robin split.\n\nDemonstrates non-overlapping shard ranges across a distributed run even\nwhen the demo executes single-process.",
+        "properties": {
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "shard_indices": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Shard Indices",
+            "type": "array"
+          },
+          "world_size": {
+            "title": "World Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rank",
+          "world_size",
+          "shard_indices"
+        ],
+        "title": "ShardAssignment",
+        "type": "object"
+      },
+      "ShardEntry": {
+        "description": "One WebDataset `.tar` shard as recorded in the manifest.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "size_bytes",
+          "count"
+        ],
+        "title": "ShardEntry",
+        "type": "object"
+      },
+      "ShardListEntry": {
+        "description": "Scoped shard-explorer row for one dataset's detail page.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "preview_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Url"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "size_human": {
+            "title": "Size Human",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "filename",
+          "size_bytes",
+          "size_human",
+          "count"
+        ],
+        "title": "ShardListEntry",
+        "type": "object"
+      },
+      "StreamRequest": {
+        "properties": {
+          "batch_size": {
+            "default": 32,
+            "title": "Batch Size",
+            "type": "integer"
+          },
+          "max_batches": {
+            "default": 20,
+            "title": "Max Batches",
+            "type": "integer"
+          },
+          "num_nodes": {
+            "default": 1,
+            "title": "Num Nodes",
+            "type": "integer"
+          },
+          "num_workers": {
+            "default": 0,
+            "title": "Num Workers",
+            "type": "integer"
+          },
+          "shuffle_buffer": {
+            "default": 100,
+            "title": "Shuffle Buffer",
+            "type": "integer"
+          }
+        },
+        "title": "StreamRequest",
+        "type": "object"
+      },
+      "StreamResult": {
+        "properties": {
+          "batch_size": {
+            "title": "Batch Size",
+            "type": "integer"
+          },
+          "batches": {
+            "title": "Batches",
+            "type": "integer"
+          },
+          "bytes_read": {
+            "title": "Bytes Read",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "device": {
+            "title": "Device",
+            "type": "string"
+          },
+          "elapsed_s": {
+            "title": "Elapsed S",
+            "type": "number"
+          },
+          "loss_curve": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Loss Curve",
+            "type": "array"
+          },
+          "mb_per_s": {
+            "title": "Mb Per S",
+            "type": "number"
+          },
+          "node_plan": {
+            "items": {
+              "$ref": "#/components/schemas/ShardAssignment"
+            },
+            "title": "Node Plan",
+            "type": "array"
+          },
+          "num_nodes": {
+            "title": "Num Nodes",
+            "type": "integer"
+          },
+          "num_workers": {
+            "title": "Num Workers",
+            "type": "integer"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "samples_per_s": {
+            "title": "Samples Per S",
+            "type": "number"
+          },
+          "worker_plan": {
+            "items": {
+              "$ref": "#/components/schemas/ShardAssignment"
+            },
+            "title": "Worker Plan",
+            "type": "array"
+          }
+        },
+        "required": [
+          "device",
+          "elapsed_s",
+          "samples",
+          "batches",
+          "bytes_read",
+          "samples_per_s",
+          "mb_per_s",
+          "loss_curve",
+          "worker_plan",
+          "node_plan",
+          "num_workers",
+          "num_nodes",
+          "batch_size",
+          "created_at"
+        ],
+        "title": "StreamResult",
+        "type": "object"
+      },
       "UploadStats": {
         "properties": {
           "total_downloads": {
@@ -463,12 +897,325 @@
     }
   },
   "info": {
-    "description": "Local API for the Vibe Coding Starter Kit template, providing file upload and management backed by Backblaze B2. This contract documents the template's local API, not a hosted public endpoint.",
-    "title": "Vibe Coding Starter Kit API",
+    "description": "Local API for WebDataset Streaming PyTorch Training: packs media into WebDataset .tar shards, writes them and a JSON manifest to Backblaze B2, and streams them back into a PyTorch training loop with no local staging disk. This contract documents the template's local API, not a hosted public endpoint.",
+    "title": "WebDataset Streaming PyTorch Training API",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",
   "paths": {
+    "/datasets": {
+      "get": {
+        "operationId": "list_datasets_endpoint_datasets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Dataset"
+                  },
+                  "title": "Response List Datasets Endpoint Datasets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Datasets Endpoint",
+        "tags": [
+          "datasets"
+        ]
+      },
+      "post": {
+        "operationId": "create_dataset_endpoint_datasets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDatasetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dataset"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Dataset Endpoint",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/datasets/stats": {
+      "get": {
+        "operationId": "dataset_stats_endpoint_datasets_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetStats"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Dataset Stats Endpoint",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/datasets/{slug}": {
+      "delete": {
+        "operationId": "delete_dataset_endpoint_datasets__slug__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Dataset Endpoint",
+        "tags": [
+          "datasets"
+        ]
+      },
+      "get": {
+        "operationId": "get_dataset_endpoint_datasets__slug__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dataset"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Dataset Endpoint",
+        "tags": [
+          "datasets"
+        ]
+      },
+      "patch": {
+        "operationId": "edit_dataset_endpoint_datasets__slug__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditDatasetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dataset"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Dataset Endpoint",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/datasets/{slug}/shards": {
+      "get": {
+        "operationId": "dataset_shards_endpoint_datasets__slug__shards_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ShardListEntry"
+                  },
+                  "title": "Response Dataset Shards Endpoint Datasets  Slug  Shards Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dataset Shards Endpoint",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/datasets/{slug}/stream": {
+      "post": {
+        "operationId": "stream_dataset_endpoint_datasets__slug__stream_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StreamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream Dataset Endpoint",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
     "/files": {
       "get": {
         "operationId": "list_files_endpoint_files_get",

@@ -1,53 +1,57 @@
-<!-- last_verified: 2026-08-06 -->
+<!-- last_verified: 2026-08-10 -->
 # App Workflows
 
 User journeys inside the application.
 
-## Upload Files
+## Create a dataset
 
-- User navigates to `/upload`
-- Drops or selects files in the dropzone
-- Client validates file size (max 100MB) and type
-- Files upload **directly from the browser to B2** (a presigned PUT). A determinate progress bar tracks the bytes leaving the browser; once they are all sent the row switches to "Verifying upload..." with an *indeterminate* sweeping bar while the API HEADs and magic-byte-sniffs the stored object. That phase has no percentage to report, and a bar parked at a full 100% read as finished-but-stuck
-- On success: toast notification, green checkmark, and a "View in Files" link through to the browser
-- On failure: red status icon with error message
-- User can clear completed uploads
-- The queue lives in an app-wide provider: navigating to another page keeps the upload running, shows an "Uploading N files" indicator in the header, and keeps the duplicate-upload guard armed
-- Reloading or closing mid-upload asks for confirmation first; if the upload dies anyway, the next load says which file didn't finish
-- See: [File Upload](features/file-upload.md)
+- User navigates to `/datasets` and clicks **New dataset**
+- The Create dialog uses selectors for every finite field: source (synthetic / raw), samples (128/256/**512**/1024), samples per shard (64/**128**/256), image size (**32**/64); name and description are free text. A guidance line states what the defaults do — no autofill button
+- On submit the API generates samples (synthetic images, or images packed from the Raw media prefix), drives `ShardWriter` to write `.tar` shards **directly to B2**, and writes a `manifest.json` index under `datasets/<slug>/`
+- On success: a toast reports the sample and shard counts; the new dataset appears in the list
+- On failure (duplicate slug, no raw media, out-of-range choice): an error toast with the reason
+- See: [Datasets](features/datasets.md), [Shard ingest](features/shard-ingest.md)
 
-## Browse and Manage Files
+## Stream a dataset into PyTorch
+
+- User opens a dataset at `/datasets/[slug]` and reviews the manifest summary
+- In the **Stream & train** panel, all knobs are selectors: workers (**0**/2/4), nodes (**1**/2/4), batch size (16/**32**/64), max batches (10/**20**/50), shuffle buffer (0/**100**/1000). The detected device is shown read-only
+- On **Start run**, WebDataset reads each shard body straight from B2 through the `s3://` opener (custom user agent, no local copy) and a bounded PyTorch loop runs on the auto-detected device (CUDA → MPS → CPU)
+- The result shows live throughput (samples/s, MB/s), elapsed time, a per-step loss sparkline, and the node/worker split plan — the non-overlapping shard ranges each rank reads
+- See: [Streaming training](features/streaming-training.md), [Distributed sharding](features/distributed-sharding.md)
+
+## Browse one dataset's shards
+
+- On the dataset detail page, the **Shards** card lists just this dataset's `.tar` shards with size, sample count, and a presigned link to each shard on B2
+- See: [Shard explorer](features/shard-explorer.md)
+
+## Edit or delete a dataset
+
+- **Edit** opens pre-filled with the real manifest (display name + description; the slug and shards are immutable)
+- **Delete** opens a confirm dialog and removes every object under `datasets/<slug>/` — a prefix-scoped delete, never a bucket-wide wipe
+- See: [Datasets](features/datasets.md)
+
+## Stage raw media
+
+- User navigates to `/ingest` ("Raw media") and drops images
+- Files upload **directly from the browser to B2** (presigned PUT) under `uploads/`; a determinate bar tracks the bytes, then an indeterminate "Verifying upload..." phase runs while the API sniffs the object
+- Those images then feed a dataset created with the **raw** source
+- See: [Raw media](features/raw-media.md)
+
+## Browse the whole bucket
 
 - User navigates to `/files`
-- Page loads the 100 most recent objects from the API (sorted most recent first). While it loads, the page says so on screen and escalates the wording if the wait runs long — a full bucket listing measured 2.8s-21s cold
-- If that limit was hit, a notice states how many objects the bucket actually holds — the page never claims to show everything
-- Files displayed in tree view with folders and type-specific icons
-- Folders auto-expand on load until the *majority* of the listed files are reachable without clicking, so the page's own "click a file" instruction is always actionable. Stopping at the first visible file was not enough: one stray top-level object left the other 99 sealed in collapsed folders while the page claimed to show 100
-- Clicking a file row opens its preview; the per-row actions menu (preview / download / delete) is always visible, on every viewport
-- Arriving at `/files?preview=<key>` expands that file's folders and opens its preview directly. This is how the ⌘K palette and the dashboard's recent-uploads rows hand off a *specific* file; the param is consumed on arrival so it doesn't re-fire later
-- **Preview**: opens dialog with image/PDF preview + metadata panel, and the file's Download / Delete actions — the advertised "click a file" path offers everything the row menu does. The loading state holds until the media paints; a failure offers "Open in a new tab". The preview URL is signed with `Content-Disposition: inline` so PDFs render in place
-- **Download**: shows a pending state on the row plus a toast while the presigned URL is fetched, then starts the download via an anchor click (which, unlike a popup, still works if the click's user activation expired during a slow presign). Failures are reported; the click can never silently do nothing
-- **Delete**: the confirmation dialog stays open showing "Deleting..." until the request settles, then the row disappears with the toast (optimistic cache update) and the list reconciles with the server. The dialog is held deliberately — Radix closes on action click by default, which dismissed the only pending state and left the row looking untouched while the delete was still in flight
-- Empty bucket shows "No files found" with upload prompt
+- The full-bucket explorer lists the 100 most recent objects in a tree view with preview, download, and delete. This is the bucket-wide counterpart to the per-dataset shard explorer
 - See: [File Browser](features/file-browser.md)
 
-## View Dashboard
+## View the dashboard
 
 - User navigates to `/` (home)
-- Three parallel API calls load: stats, recent files, upload activity — all served from one shared bucket listing that the API warms at startup
-- While stats load, the page states it in words above the cards rather than showing silent skeletons
-- Stats cards show: total files, storage used, uploads today, total downloads
-- Upload chart shows last 7 days of upload activity as bar chart
-- Recent uploads table shows last 10 files with filename, size, type, date. Each filename links to that file's preview on `/files` — `/files` teaches "click a file to preview it", so the same gesture here has to answer rather than being inert text
-- Empty state: "No files uploaded yet" messages
+- Stat cards show dataset / shard / sample counts and total shard storage; a table lists recent datasets and a card shows the last streaming run's throughput and device
 - See: [Dashboard](features/dashboard.md)
 
-## Change Preferences
+## Change preferences
 
 - User navigates to `/settings`
-- A banner at the top states that the page is mostly a demonstration: only Theme is wired up for real, the rest showcases what a settings page can look like when you adapt the kit
-- **Theme** (real): editing it and saving applies it immediately and persists it (`next-themes`), and the header's theme toggle drives the same state
-- **Profile and preference fields** (demo): Display name, Bio, Default file view (Tree/List/Grid), Email me on every upload, Warn me when approaching quota + threshold. Each is labelled "Demo field", persists to `localStorage` only, and drives no behaviour — there is no account system, mailer, quota banner, activity log, or List/Grid view behind them yet
-- Saving reports honestly: a success toast that separates the real theme change from the locally-stored demo values, or a warning toast if the browser blocked storage (theme still changes). It never claims a save that did not happen — the original page toasted "Settings saved" for fields that changed nothing
-- Danger Zone actions are a demo — no real delete runs
+- A banner states the page is mostly a demonstration: only Theme is wired for real; the rest persists to `localStorage` and drives no behaviour
 - See: [Settings](features/settings.md)

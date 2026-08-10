@@ -36,7 +36,7 @@ import {
   fileListTruncationNotice,
 } from "@/lib/file-list-limit";
 import { ancestorPaths, takePreviewKeyFromUrl } from "@/lib/preview-deep-link";
-import type { FileMetadata } from "@vibe-coding-starter-kit/shared";
+import type { FileMetadata } from "@webdataset-streaming-pytorch-training/shared";
 
 export function FileBrowser() {
   const {
@@ -203,9 +203,9 @@ export function FileBrowser() {
               description="Upload some files to see them listed here."
               action={
                 <Button asChild size="sm">
-                  <Link href="/upload">
+                  <Link href="/ingest">
                     <Upload aria-hidden="true" className="h-3.5 w-3.5" />
-                    Upload files
+                    Raw media
                   </Link>
                 </Button>
               }

@@ -20,22 +20,25 @@ infra/railway/     Deployment config
 infra/vercel/      Vercel deployment contract
 ```
 
-## 2. Building on This Starter Kit
+## 2. Building on this app
 
-When this repo is used as the foundation for a new app, the following pieces are part of the starter contract — keep them. Adapt only what the new use case actually requires.
+This app is built on the vibe-coding-starter-kit. The **primary entity is the
+Dataset** (a WebDataset shard collection under `datasets/<slug>/` on B2). The
+pieces below are the reusable B2-backed scaffolding — keep them; extend the
+dataset surface for a real corpus.
 
 **Keep as-is (do not strip, rename, or replace)**
 - **UI kit / design system.** `apps/web/src/components/ui/` (shadcn primitives), the design tokens in `apps/web/src/app/globals.css`, and the `/design` reference page. Build new screens with these primitives; never edit the generated `components/ui/` files directly. Restyling happens through tokens in `globals.css`.
-- **File Explorer.** `/files` route, `apps/web/src/app/files/`, and `apps/web/src/components/files/`. The Files sidebar entry in `apps/web/src/components/layout/app-sidebar.tsx` stays.
-- **Upload.** `/upload` route, `apps/web/src/app/upload/`, and `apps/web/src/components/upload/`. The Upload sidebar entry stays.
-- The sidebar nav itself (Dashboard, Upload, Files, Settings, plus the Design System utility link).
+- **File Explorer.** `/files` route, `apps/web/src/app/files/`, and `apps/web/src/components/files/` — the full-bucket browser. The Files sidebar entry stays.
+- **Raw media (upload).** `/ingest` route, `apps/web/src/app/ingest/`, and `apps/web/src/components/upload/` — direct-to-B2 upload that stages images under `uploads/`. The Raw media sidebar entry stays.
+- The sidebar nav itself (Dashboard, Datasets, Raw media, Files, Settings, plus the Design System utility link).
 
-**Adapt to the new use case**
-- **Dashboard.** `/` route and `apps/web/src/components/dashboard/` (stats cards, upload chart, recent uploads table) are illustrative defaults. Replace them with metrics, charts, and tables that reflect what the new app actually does (e.g. transcripts processed, embeddings indexed, classifications run). New aggregations must flow through the same `runtime -> service -> repo` layering and be exposed via TanStack Query hooks in `apps/web/src/lib/queries.ts` — no bare `useEffect + fetch`.
-- Update `docs/features/dashboard.md` in the same PR as any dashboard change (see §9).
+**The primary surface**
+- **Datasets.** The datasets router/service, `repo/webdataset_repo.py` (the B2↔WebDataset boundary: `s3://` opener + `ShardWriter`), and `service/training.py` (the torch loop) are what you extend for a real corpus — swap `service/synthetic.py` for your own ingestion. New aggregations flow through `runtime -> service -> repo` and are exposed via TanStack Query hooks in `apps/web/src/lib/queries.ts` — no bare `useEffect + fetch`.
+- **Dashboard.** `/` route and `apps/web/src/components/dashboard/` are dataset-centric (dataset stats + last-run throughput); adapt freely. Update `docs/features/dashboard.md` in the same PR as any dashboard change (see §9).
 
-**Why this contract exists**
-- The UI kit, Files, and Upload pages are the reusable B2-backed scaffolding that makes this a starter kit — stripping them defeats the purpose. The dashboard is the only screen explicitly designed to be rewritten per app.
+**Invariants that still hold**
+- boto3 only in `repo/`; torch only in `service/training.py`; every S3 client carries the custom user agent; prefix-scoped deletes only.
 
 ## 3. Architectural Invariants
 
