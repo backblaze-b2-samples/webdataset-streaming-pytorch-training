@@ -5,8 +5,6 @@ Keep your entire training corpus on **[Backblaze B2](https://www.backblaze.com/s
 
 Everything runs on **local open-source only** — PyTorch + WebDataset on-device, device auto-detected (CUDA → Apple MPS → CPU). Your **B2 credentials are the only secret**; there is no second API key and no external AI provider.
 
-Explore the official [Backblaze B2 AI integrations and sample applications](https://www.backblaze.com/cloud-storage/b2-ai-integrations?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-webdataset-streaming-pytorch-training) directory and the checked-in [local OpenAPI contract](docs/api/openapi.json).
-
 **What you get out of the box:**
 - Dataset lifecycle over B2 — create (synthetic or from raw media), list, edit, delete, and **stream** WebDataset shard collections that live under `datasets/<slug>/`.
 - A custom `s3://` WebDataset opener so every shard read carries the app's B2 user agent and copies nothing to local disk.
